@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · 数据管理</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .page { max-width: 1100px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; white-space: nowrap; }
+  th { background: var(--card-bg); position: sticky; top: 0; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  .count { color: var(--text-muted); font-size: 14px; }
+  .export-button { width: auto; padding: 10px 18px; }
+  .auth-card { max-width: 360px; margin: 60px auto 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>罗兰优选 · 数据管理</h1>
+    <p class="subtitle">存量设备采集记录</p>
+  </header>
+
+  <section class="card auth-card" id="auth-gate">
+    <h2>管理员登录</h2>
+    <label class="field">
+      <span>密码</span>
+      <input type="password" id="admin-password" autocomplete="current-password">
+    </label>
+    <div id="auth-message" class="form-message"></div>
+    <button type="button" class="submit-button" id="auth-submit">加载数据</button>
+  </section>
+
+  <div id="main-view" style="display:none;">
+    <div class="toolbar">
+      <span class="count" id="record-count">加载中...</span>
+      <button type="button" class="submit-button export-button" id="export-button">导出 CSV</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="records-table">
+        <thead>
+          <tr>
+            <th>提交时间</th>
+            <th>录入人</th>
+            <th>意向</th>
+            <th>客户名称</th>
+            <th>联系方式</th>
+            <th>设备型号</th>
+            <th>序列号</th>
+            <th>总印数</th>
+            <th>生产小时数</th>
+            <th>维护历史</th>
+            <th>外观问题</th>
+            <th>期望成交价</th>
+            <th>期望周期</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody id="records-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var API_BASE = '/functions/v1/roland-select';
+  var INTENT_LABELS = { buy: '想买', sell: '想卖', both: '想买/想卖' };
+  var MAINTENANCE_LABELS = { factory: '原厂维护', informal: '社会散修', mixed: '混合', unknown: '不详' };
+  var CONDITION_LABELS = { missingWaterTank: '缺水箱', missingUV: '缺UV', missingDryer: '缺干燥组', cylinderDamage: '压过炮', other: '其他' };
+
+  var authGate = document.getElementById('auth-gate');
+  var authMessage = document.getElementById('auth-message');
+  var passwordInput = document.getElementById('admin-password');
+  var authSubmit = document.getElementById('auth-submit');
+  var mainView = document.getElementById('main-view');
+  var authHeader = '';
+
+  function cell(text) {
+    var td = document.createElement('td');
+    td.textContent = text === undefined || text === null || text === '' ? '—' : text;
+    return td;
+  }
+
+  function renderRow(record) {
+    var tr = document.createElement('tr');
+    var conditionText = Array.isArray(record.condition_issues)
+      ? record.condition_issues.map(function (issue) { return CONDITION_LABELS[issue] || issue; }).join('、')
+      : '';
+
+    tr.appendChild(cell(record.submitted_at ? new Date(record.submitted_at).toLocaleString('zh-CN') : ''));
+    tr.appendChild(cell(record.sales_rep));
+    tr.appendChild(cell(INTENT_LABELS[record.intent] || record.intent));
+    tr.appendChild(cell(record.customer_name));
+    tr.appendChild(cell(record.contact));
+    tr.appendChild(cell(record.model));
+    tr.appendChild(cell(record.serial_number));
+    tr.appendChild(cell(record.total_impressions));
+    tr.appendChild(cell(record.production_hours));
+    tr.appendChild(cell(MAINTENANCE_LABELS[record.maintenance_history] || record.maintenance_history));
+    tr.appendChild(cell(conditionText));
+    tr.appendChild(cell(record.expected_price));
+    tr.appendChild(cell(record.expected_timeline));
+    tr.appendChild(cell(record.notes));
+    return tr;
+  }
+
+  async function loadRecords() {
+    var countLabel = document.getElementById('record-count');
+    var tbody = document.getElementById('records-body');
+    tbody.innerHTML = '';
+
+    var response = await fetch(API_BASE + '/api/submissions', {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    });
+
+    if (response.status === 401) {
+      authMessage.textContent = '密码错误';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+    if (!response.ok) {
+      authMessage.textContent = '加载失败（' + response.status + '）';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+
+    var data = await response.json();
+    var submissions = data.submissions || [];
+    submissions.forEach(function (record) { tbody.appendChild(renderRow(record)); });
+    countLabel.textContent = '共 ' + submissions.length + ' 条记录';
+    return true;
+  }
+
+  authSubmit.addEventListener('click', async function () {
+    authHeader = 'Basic ' + btoa('admin:' + passwordInput.value);
+    authMessage.textContent = '加载中...';
+    authMessage.className = 'form-message';
+    authSubmit.disabled = true;
+
+    try {
+      var ok = await loadRecords();
+      if (ok) {
+        authGate.style.display = 'none';
+        mainView.style.display = 'block';
+      }
+    } catch (error) {
+      authMessage.textContent = '网络异常，请重试';
+      authMessage.className = 'form-message error';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  passwordInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') authSubmit.click();
+  });
+
+  document.getElementById('export-button').addEventListener('click', async function () {
+    try {
+      var response = await fetch(API_BASE + '/api/export', {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+      if (!response.ok) {
+        alert('导出失败（' + response.status + '）');
+        return;
+      }
+      var blob = await response.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'roland-select-' + Date.now() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('导出失败，请检查网络');
+    }
+  });
+})();
+</script>
+</body>
+</html>

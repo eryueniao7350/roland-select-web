@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · 设备数据采集</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>罗兰优选</h1>
+    <p class="subtitle">存量设备现场数据采集</p>
+  </header>
+
+  <form id="intake-form" novalidate>
+    <section class="card">
+      <h2>基本信息</h2>
+      <label class="field">
+        <span>录入人 / 销售顾问 <em>*</em></span>
+        <input type="text" name="salesRep" required maxlength="50" autocomplete="name">
+      </label>
+      <label class="field">
+        <span>客户名称 <em>*</em></span>
+        <input type="text" name="customerName" required maxlength="100">
+      </label>
+      <label class="field">
+        <span>联系方式</span>
+        <input type="text" name="contact" maxlength="100" placeholder="手机号 / 微信">
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>买卖意向 <em>*</em></h2>
+      <div class="radio-group" role="radiogroup" aria-label="买卖意向">
+        <label class="radio-pill"><input type="radio" name="intent" value="sell" required><span>想卖</span></label>
+        <label class="radio-pill"><input type="radio" name="intent" value="buy"><span>想买</span></label>
+        <label class="radio-pill"><input type="radio" name="intent" value="both"><span>都想了解</span></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>设备信息</h2>
+      <label class="field">
+        <span>设备型号</span>
+        <input type="text" name="model" maxlength="100" placeholder="例如：700系列">
+      </label>
+      <label class="field">
+        <span>序列号 <em>*</em></span>
+        <input type="text" name="serialNumber" required maxlength="100">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>总印数</span>
+          <input type="number" name="totalImpressions" min="0" inputmode="numeric" placeholder="张">
+        </label>
+        <label class="field">
+          <span>生产小时数</span>
+          <input type="number" name="productionHours" min="0" inputmode="numeric" placeholder="小时">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>维护历史</h2>
+      <label class="field">
+        <span>维护类型</span>
+        <select name="maintenanceHistory">
+          <option value="">请选择</option>
+          <option value="factory">原厂维护</option>
+          <option value="informal">社会散修</option>
+          <option value="mixed">混合</option>
+          <option value="unknown">不详</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>维护备注</span>
+        <textarea name="maintenanceNotes" maxlength="500" rows="2"></textarea>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>外观完整度</h2>
+      <div class="checkbox-group">
+        <label class="checkbox-pill"><input type="checkbox" name="conditionIssues" value="missingWaterTank"><span>缺水箱</span></label>
+        <label class="checkbox-pill"><input type="checkbox" name="conditionIssues" value="missingUV"><span>缺UV</span></label>
+        <label class="checkbox-pill"><input type="checkbox" name="conditionIssues" value="missingDryer"><span>缺干燥组</span></label>
+        <label class="checkbox-pill"><input type="checkbox" name="conditionIssues" value="cylinderDamage"><span>压过炮</span></label>
+        <label class="checkbox-pill"><input type="checkbox" name="conditionIssues" value="other"><span>其他</span></label>
+      </div>
+      <label class="field">
+        <span>外观备注</span>
+        <textarea name="conditionNotes" maxlength="500" rows="2"></textarea>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>成交预期</h2>
+      <div class="field-row">
+        <label class="field">
+          <span>期望成交价</span>
+          <input type="text" name="expectedPrice" maxlength="50" placeholder="例如：50万左右">
+        </label>
+        <label class="field">
+          <span>期望成交周期</span>
+          <input type="text" name="expectedTimeline" maxlength="50" placeholder="例如：3个月内">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>备注</h2>
+      <label class="field">
+        <textarea name="notes" maxlength="1000" rows="3" placeholder="其他补充信息"></textarea>
+      </label>
+    </section>
+
+    <div id="form-message" class="form-message" role="status" aria-live="polite"></div>
+
+    <button type="submit" class="submit-button">提交</button>
+  </form>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

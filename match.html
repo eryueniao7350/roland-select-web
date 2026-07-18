@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · 撮合看板</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .page { max-width: 960px; }
+  .auth-card { max-width: 360px; margin: 60px auto 0; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  .count { color: var(--text-muted); font-size: 14px; }
+  .back-link { font-size: 14px; color: var(--accent); text-decoration: none; }
+  .match-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .match-group-head h2 { margin: 0; font-size: 16px; }
+  .match-badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-contrast); }
+  .match-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) {
+    .match-columns { grid-template-columns: 1fr; }
+  }
+  .match-column h3 { font-size: 13px; color: var(--text-muted); margin: 0 0 8px; }
+  .match-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .match-item .name { font-weight: 600; }
+  .match-item .meta { color: var(--text-muted); margin-top: 4px; }
+  .match-empty { color: var(--text-muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>罗兰优选 · 撮合看板</h1>
+    <p class="subtitle">按设备型号匹配买卖意向</p>
+  </header>
+
+  <section class="card auth-card" id="auth-gate">
+    <h2>管理员登录</h2>
+    <label class="field">
+      <span>密码</span>
+      <input type="password" id="admin-password" autocomplete="current-password">
+    </label>
+    <div id="auth-message" class="form-message"></div>
+    <button type="button" class="submit-button" id="auth-submit">加载数据</button>
+  </section>
+
+  <div id="main-view" style="display:none;">
+    <div class="toolbar">
+      <a class="back-link" href="admin.html">&larr; 返回数据管理</a>
+      <span class="count" id="group-count"></span>
+    </div>
+    <div id="groups"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var API_BASE = 'https://rlpxjrqhdniyavixvgyz.supabase.co/functions/v1/roland-select';
+  var UNSPECIFIED_KEY = '__unspecified__';
+
+  var authGate = document.getElementById('auth-gate');
+  var authMessage = document.getElementById('auth-message');
+  var passwordInput = document.getElementById('admin-password');
+  var authSubmit = document.getElementById('auth-submit');
+  var mainView = document.getElementById('main-view');
+  var authHeader = '';
+
+  function itemLabel(record) {
+    return record.intent === 'both' ? '（买卖皆可）' : '';
+  }
+
+  function renderItem(record, side) {
+    var div = document.createElement('div');
+    div.className = 'match-item';
+
+    var name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = (record.customer_name || '未填写客户名') + itemLabel(record);
+    div.appendChild(name);
+
+    var metaLine1 = document.createElement('div');
+    metaLine1.className = 'meta';
+    metaLine1.textContent = [record.contact, '录入人：' + (record.sales_rep || '—')].filter(Boolean).join(' · ');
+    div.appendChild(metaLine1);
+
+    if (side === 'sell') {
+      var metaLine2 = document.createElement('div');
+      metaLine2.className = 'meta';
+      var parts = [];
+      if (record.serial_number) parts.push('序列号：' + record.serial_number);
+      if (record.expected_price) parts.push('期望价：' + record.expected_price);
+      if (record.expected_timeline) parts.push('周期：' + record.expected_timeline);
+      metaLine2.textContent = parts.join(' · ');
+      if (parts.length > 0) div.appendChild(metaLine2);
+    }
+
+    var metaLine3 = document.createElement('div');
+    metaLine3.className = 'meta';
+    metaLine3.textContent = record.submitted_at ? new Date(record.submitted_at).toLocaleString('zh-CN') : '';
+    div.appendChild(metaLine3);
+
+    return div;
+  }
+
+  function renderColumn(title, items, side) {
+    var col = document.createElement('div');
+    col.className = 'match-column';
+    var heading = document.createElement('h3');
+    heading.textContent = title + '（' + items.length + '）';
+    col.appendChild(heading);
+
+    if (items.length === 0) {
+      var empty = document.createElement('p');
+      empty.className = 'match-empty';
+      empty.textContent = '暂无';
+      col.appendChild(empty);
+    } else {
+      items.forEach(function (record) { col.appendChild(renderItem(record, side)); });
+    }
+    return col;
+  }
+
+  function renderGroup(group) {
+    var section = document.createElement('section');
+    section.className = 'card';
+
+    var head = document.createElement('div');
+    head.className = 'match-group-head';
+    var h2 = document.createElement('h2');
+    h2.textContent = '型号：' + group.displayModel;
+    head.appendChild(h2);
+    if (group.sellItems.length > 0 && group.buyItems.length > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'match-badge';
+      badge.textContent = '可撮合';
+      head.appendChild(badge);
+    }
+    section.appendChild(head);
+
+    var columns = document.createElement('div');
+    columns.className = 'match-columns';
+    columns.appendChild(renderColumn('想卖', group.sellItems, 'sell'));
+    columns.appendChild(renderColumn('想买', group.buyItems, 'buy'));
+    section.appendChild(columns);
+
+    return section;
+  }
+
+  function buildGroups(submissions) {
+    var groups = {};
+    submissions.forEach(function (record) {
+      var raw = (record.model || '').trim();
+      var key = raw ? raw.toLowerCase() : UNSPECIFIED_KEY;
+      if (!groups[key]) {
+        groups[key] = { displayModel: raw || '未填写', sellItems: [], buyItems: [] };
+      }
+      var group = groups[key];
+      if (record.intent === 'sell' || record.intent === 'both') group.sellItems.push(record);
+      if (record.intent === 'buy' || record.intent === 'both') group.buyItems.push(record);
+    });
+
+    var groupList = Object.keys(groups)
+      .filter(function (key) { return key !== UNSPECIFIED_KEY; })
+      .map(function (key) { return groups[key]; });
+
+    groupList.sort(function (a, b) {
+      var aMatch = a.sellItems.length > 0 && a.buyItems.length > 0;
+      var bMatch = b.sellItems.length > 0 && b.buyItems.length > 0;
+      if (aMatch !== bMatch) return aMatch ? -1 : 1;
+      return (b.sellItems.length + b.buyItems.length) - (a.sellItems.length + a.buyItems.length);
+    });
+
+    if (groups[UNSPECIFIED_KEY]) groupList.push(groups[UNSPECIFIED_KEY]);
+    return groupList;
+  }
+
+  async function loadData() {
+    var response = await fetch(API_BASE + '/api/submissions', {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    });
+
+    if (response.status === 401) {
+      authMessage.textContent = '密码错误';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+    if (!response.ok) {
+      authMessage.textContent = '加载失败（' + response.status + '）';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+
+    var data = await response.json();
+    var submissions = data.submissions || [];
+    var groupList = buildGroups(submissions);
+
+    var groupsContainer = document.getElementById('groups');
+    groupsContainer.innerHTML = '';
+    groupList.forEach(function (group) { groupsContainer.appendChild(renderGroup(group)); });
+
+    var matchedCount = groupList.filter(function (g) { return g.sellItems.length > 0 && g.buyItems.length > 0; }).length;
+    document.getElementById('group-count').textContent =
+      '共 ' + groupList.length + ' 个型号分组，其中 ' + matchedCount + ' 个可撮合';
+
+    return true;
+  }
+
+  authSubmit.addEventListener('click', async function () {
+    authHeader = 'Basic ' + btoa('admin:' + passwordInput.value);
+    authMessage.textContent = '加载中...';
+    authMessage.className = 'form-message';
+    authSubmit.disabled = true;
+
+    try {
+      var ok = await loadData();
+      if (ok) {
+        authGate.style.display = 'none';
+        mainView.style.display = 'block';
+      }
+    } catch (error) {
+      authMessage.textContent = '网络异常，请重试';
+      authMessage.className = 'form-message error';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  passwordInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') authSubmit.click();
+  });
+})();
+</script>
+</body>
+</html>

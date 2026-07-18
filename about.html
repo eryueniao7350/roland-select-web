@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · Roland Select</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .page { max-width: 860px; }
+  .hero { text-align: center; padding: 48px 16px 36px; }
+  .hero h1 { margin: 0 0 10px; font-size: 30px; letter-spacing: 0.02em; }
+  .hero p { margin: 0 auto; max-width: 560px; color: var(--text-muted); font-size: 15px; line-height: 1.7; }
+  .hero .eyebrow { display: inline-block; margin-bottom: 12px; font-size: 13px; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+
+  .context-card { text-align: center; }
+  .context-card p { line-height: 1.8; font-size: 14px; color: var(--text); }
+
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  @media (max-width: 720px) {
+    .pillars { grid-template-columns: 1fr; }
+  }
+  .pillar-card { text-align: left; }
+  .pillar-card .pillar-name { font-size: 12px; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
+  .pillar-card h2 { margin: 0 0 10px; font-size: 19px; }
+  .pillar-card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.8; }
+
+  .cta-card { text-align: center; }
+  .cta-card h2 { margin: 0 0 10px; font-size: 18px; }
+  .cta-card p { color: var(--text-muted); font-size: 14px; line-height: 1.8; margin: 0; }
+
+  .footer-note { text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <span class="eyebrow">Roland Select</span>
+    <h1>罗兰优选</h1>
+    <p>面向曼罗兰 / 海德堡存量印刷设备的增值服务体系——用原厂专家背书，让二手设备买卖双方不再互相猜疑。</p>
+  </div>
+
+  <section class="card context-card">
+    <p>
+      随着曼罗兰新机型停产，围绕存量设备的服务需求正在成为新的价值支点。中国市场约有 2,000 台曼罗兰设备仍在运转，
+      罗兰优选正是为这些设备的下一段生命周期而生：不做新机推销，而是帮买卖双方在信息不对称的存量市场里，
+      找到彼此信得过的成交方式。
+    </p>
+  </section>
+
+  <div class="pillars">
+    <section class="card pillar-card">
+      <div class="pillar-name">Select</div>
+      <h2>认证</h2>
+      <ul>
+        <li>原厂专家现场分级评估</li>
+        <li>标准化设备状况报告</li>
+        <li>官方书面背书，买卖双方互信基础</li>
+      </ul>
+    </section>
+    <section class="card pillar-card">
+      <div class="pillar-name">Renew</div>
+      <h2>换新</h2>
+      <ul>
+        <li>模块化升级（上光组、UV / 水性干燥组等）</li>
+        <li>自动化控制系统升级</li>
+        <li>数字化联网改造，接入海德堡系统</li>
+      </ul>
+    </section>
+    <section class="card pillar-card">
+      <div class="pillar-name">Care</div>
+      <h2>管家</h2>
+      <ul>
+        <li>依托海德堡全球网络的备件保障</li>
+        <li>原厂操作与维护培训</li>
+        <li>零配件 + 耗材 + 保养打包服务</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card cta-card">
+    <h2>了解更多</h2>
+    <p>无论您手上的设备正考虑出手，还是希望寻找一台有背书的二手设备，都可以联系您对接的罗兰优选团队成员，获取认证评估或撮合建议。</p>
+  </section>
+
+  <p class="footer-note">罗兰优选 Roland Select · 曼罗兰存量设备增值服务</p>
+</div>
+</body>
+</html>

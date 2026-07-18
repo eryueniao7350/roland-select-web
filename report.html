@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · 认证报告</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .auth-card { max-width: 360px; margin: 60px auto 0; }
+  .report-page { max-width: 720px; }
+  .report-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .back-link { font-size: 14px; color: var(--accent); text-decoration: none; }
+  .print-button { width: auto; padding: 10px 18px; }
+  .report-doc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 28px; }
+  .report-head { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 16px; margin-bottom: 20px; }
+  .report-head h1 { margin: 0 0 4px; font-size: 20px; }
+  .report-head p { margin: 0; color: var(--text-muted); font-size: 13px; }
+  .report-section { margin-bottom: 20px; }
+  .report-section h2 { font-size: 14px; color: var(--text-muted); margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; font-size: 14px; }
+  .report-grid dt { color: var(--text-muted); display: inline; }
+  .report-grid dd { margin: 0 0 0 6px; display: inline; }
+  .report-grid > div { display: flex; }
+  .grade-badge { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; font-size: 24px; font-weight: 700; color: #fff; }
+  .grade-A { background: #1e7e34; }
+  .grade-B { background: #1c6fb0; }
+  .grade-C { background: #b3542c; }
+  .grade-D { background: #c62828; }
+  .grade-row { display: flex; align-items: center; gap: 16px; }
+  .grade-meta { font-size: 13px; color: var(--text-muted); }
+  .report-notes { font-size: 14px; white-space: pre-wrap; }
+  .report-footer { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 24px; font-size: 12px; color: var(--text-muted); }
+  .not-certified { text-align: center; padding: 20px 0; }
+
+  @media print {
+    body { background: #fff; }
+    .auth-card, .report-toolbar, .not-certified a { display: none !important; }
+    .report-doc { border: none; padding: 0; }
+    .page { max-width: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page report-page">
+  <section class="card auth-card" id="auth-gate">
+    <h2>管理员登录</h2>
+    <label class="field">
+      <span>密码</span>
+      <input type="password" id="admin-password" autocomplete="current-password">
+    </label>
+    <div id="auth-message" class="form-message"></div>
+    <button type="button" class="submit-button" id="auth-submit">进入</button>
+  </section>
+
+  <div id="main-view" style="display:none;">
+    <div class="report-toolbar">
+      <a class="back-link" href="admin.html">&larr; 返回数据管理</a>
+      <button type="button" class="submit-button print-button" id="print-button">打印 / 导出 PDF</button>
+    </div>
+
+    <section class="card not-certified" id="not-certified-card" style="display:none;">
+      <p id="not-certified-message"></p>
+      <a class="submit-button" id="certify-link" style="display:inline-block; text-decoration:none; padding:10px 18px;">前往认证评级</a>
+    </section>
+
+    <div class="report-doc" id="report-doc" style="display:none;">
+      <div class="report-head">
+        <h1>罗兰优选 · 设备认证报告</h1>
+        <p id="report-id"></p>
+      </div>
+
+      <div class="report-section grade-row">
+        <div class="grade-badge" id="grade-badge">—</div>
+        <div class="grade-meta">
+          <div id="grade-label"></div>
+          <div id="cert-meta"></div>
+        </div>
+      </div>
+
+      <div class="report-section">
+        <h2>设备信息</h2>
+        <div class="report-grid" id="device-grid"></div>
+      </div>
+
+      <div class="report-section">
+        <h2>质保条款</h2>
+        <div class="report-grid" id="warranty-grid"></div>
+        <p class="report-notes" id="warranty-notes"></p>
+      </div>
+
+      <div class="report-section" id="notes-section" style="display:none;">
+        <h2>认证备注</h2>
+        <p class="report-notes" id="summary-notes"></p>
+      </div>
+
+      <div class="report-footer">
+        本报告由罗兰优选（Roland Select）依据现场数据与原厂专家评估生成，作为设备状况的参考背书，不构成法律意义上的质量担保。如对报告内容有疑问，请联系罗兰优选团队核实。
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var API_BASE = 'https://rlpxjrqhdniyavixvgyz.supabase.co/functions/v1/roland-select';
+  var INTENT_LABELS = { buy: '想买', sell: '想卖', both: '想买/想卖' };
+  var MAINTENANCE_LABELS = { factory: '原厂维护', informal: '社会散修', mixed: '混合', unknown: '不详' };
+  var CONDITION_LABELS = { missingWaterTank: '缺水箱', missingUV: '缺UV', missingDryer: '缺干燥组', cylinderDamage: '压过炮', other: '其他' };
+  var GRADE_LABELS = { A: 'A 级 · 优秀', B: 'B 级 · 良好', C: 'C 级 · 合格', D: 'D 级 · 待整备' };
+
+  var submissionId = new URLSearchParams(location.search).get('id');
+
+  var authGate = document.getElementById('auth-gate');
+  var authMessage = document.getElementById('auth-message');
+  var passwordInput = document.getElementById('admin-password');
+  var authSubmit = document.getElementById('auth-submit');
+  var mainView = document.getElementById('main-view');
+  var authHeader = '';
+
+  function field(container, label, value) {
+    var div = document.createElement('div');
+    var dt = document.createElement('dt');
+    dt.textContent = label + '：';
+    var dd = document.createElement('dd');
+    dd.textContent = value === undefined || value === null || value === '' ? '—' : value;
+    div.appendChild(dt);
+    div.appendChild(dd);
+    container.appendChild(div);
+  }
+
+  function renderDevice(record) {
+    var grid = document.getElementById('device-grid');
+    grid.innerHTML = '';
+    field(grid, '客户名称', record.customer_name);
+    field(grid, '买卖意向', INTENT_LABELS[record.intent] || record.intent);
+    field(grid, '设备型号', record.model);
+    field(grid, '序列号', record.serial_number);
+    field(grid, '总印数', record.total_impressions);
+    field(grid, '生产小时数', record.production_hours);
+    field(grid, '维护历史', MAINTENANCE_LABELS[record.maintenance_history] || record.maintenance_history);
+    var conditionText = Array.isArray(record.condition_issues) && record.condition_issues.length > 0
+      ? record.condition_issues.map(function (issue) { return CONDITION_LABELS[issue] || issue; }).join('、')
+      : '无明显问题';
+    field(grid, '外观状况', conditionText);
+  }
+
+  function renderCertification(cert) {
+    document.getElementById('report-id').textContent = '报告编号：' + cert.id.slice(0, 8).toUpperCase();
+
+    var badge = document.getElementById('grade-badge');
+    badge.textContent = cert.grade;
+    badge.className = 'grade-badge grade-' + cert.grade;
+    document.getElementById('grade-label').textContent = GRADE_LABELS[cert.grade] || cert.grade;
+    document.getElementById('cert-meta').textContent =
+      '认证人：' + cert.certifier_name + '　认证时间：' + (cert.certified_at ? new Date(cert.certified_at).toLocaleString('zh-CN') : '—');
+
+    var warrantyGrid = document.getElementById('warranty-grid');
+    warrantyGrid.innerHTML = '';
+    field(warrantyGrid, '质保月数', cert.warranty_months !== null && cert.warranty_months !== undefined ? cert.warranty_months + ' 个月' : '未提供');
+    document.getElementById('warranty-notes').textContent = cert.warranty_notes || '';
+
+    if (cert.summary_notes) {
+      document.getElementById('notes-section').style.display = 'block';
+      document.getElementById('summary-notes').textContent = cert.summary_notes;
+    }
+  }
+
+  async function loadData() {
+    var headers = authHeader ? { Authorization: authHeader } : {};
+    var [submissionsRes, certificationsRes] = await Promise.all([
+      fetch(API_BASE + '/api/submissions', { headers: headers }),
+      fetch(API_BASE + '/api/certifications', { headers: headers }),
+    ]);
+
+    if (submissionsRes.status === 401 || certificationsRes.status === 401) {
+      authMessage.textContent = '密码错误';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+    if (!submissionsRes.ok || !certificationsRes.ok) {
+      authMessage.textContent = '加载失败';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+
+    var submissionsData = await submissionsRes.json();
+    var certificationsData = await certificationsRes.json();
+    var submissions = submissionsData.submissions || [];
+    var certifications = certificationsData.certifications || [];
+
+    var submission = submissions.filter(function (s) { return s.id === submissionId; })[0] || null;
+    document.getElementById('certify-link').href = 'certify.html?submission=' + encodeURIComponent(submissionId || '');
+
+    if (!submission) {
+      document.getElementById('not-certified-message').textContent = '未找到对应的设备记录。';
+      document.getElementById('not-certified-card').style.display = 'block';
+      return true;
+    }
+
+    var matchingCerts = certifications
+      .filter(function (c) { return c.submission_id === submissionId; })
+      .sort(function (a, b) { return new Date(b.certified_at) - new Date(a.certified_at); });
+
+    if (matchingCerts.length === 0) {
+      document.getElementById('not-certified-message').textContent = '该设备尚未完成认证评级。';
+      document.getElementById('not-certified-card').style.display = 'block';
+      return true;
+    }
+
+    renderDevice(submission);
+    renderCertification(matchingCerts[0]);
+    document.getElementById('report-doc').style.display = 'block';
+    return true;
+  }
+
+  authSubmit.addEventListener('click', async function () {
+    authHeader = 'Basic ' + btoa('admin:' + passwordInput.value);
+    authMessage.textContent = '加载中...';
+    authMessage.className = 'form-message';
+    authSubmit.disabled = true;
+
+    try {
+      var ok = await loadData();
+      if (ok) {
+        authGate.style.display = 'none';
+        mainView.style.display = 'block';
+      }
+    } catch (error) {
+      authMessage.textContent = '网络异常，请重试';
+      authMessage.className = 'form-message error';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  passwordInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') authSubmit.click();
+  });
+
+  document.getElementById('print-button').addEventListener('click', function () {
+    window.print();
+  });
+
+  if (!submissionId) {
+    document.body.innerHTML = '<div class="page"><section class="card"><p>缺少设备记录参数，请从 <a href="admin.html">数据管理页</a> 进入。</p></section></div>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗兰优选 · 认证评级</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .auth-card { max-width: 360px; margin: 60px auto 0; }
+  .summary-list { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 14px; }
+  .summary-list dt { color: var(--text-muted); }
+  .summary-list dd { margin: 0; }
+  .grade-group .radio-pill span { display: block; text-align: center; min-width: 84px; }
+  .grade-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .back-link { display: inline-block; margin-bottom: 14px; font-size: 14px; color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>罗兰优选 · 认证评级</h1>
+    <p class="subtitle">Select 支柱：原厂专家分级</p>
+  </header>
+
+  <section class="card auth-card" id="auth-gate">
+    <h2>管理员登录</h2>
+    <label class="field">
+      <span>密码</span>
+      <input type="password" id="admin-password" autocomplete="current-password">
+    </label>
+    <div id="auth-message" class="form-message"></div>
+    <button type="button" class="submit-button" id="auth-submit">进入</button>
+  </section>
+
+  <div id="main-view" style="display:none;">
+    <a class="back-link" href="admin.html">&larr; 返回数据管理</a>
+
+    <section class="card" id="not-found-card" style="display:none;">
+      <p>未找到对应的设备记录，请从<a href="admin.html">数据管理页</a>进入。</p>
+    </section>
+
+    <div id="content" style="display:none;">
+      <section class="card">
+        <h2>设备信息</h2>
+        <dl class="summary-list" id="submission-summary"></dl>
+      </section>
+
+      <section class="card" id="existing-cert-card" style="display:none;">
+        <h2>历史认证</h2>
+        <dl class="summary-list" id="existing-cert-summary"></dl>
+        <p class="grade-hint">再次提交会生成一条新的认证记录，报告页始终展示最新一次认证结果。</p>
+      </section>
+
+      <form id="certify-form" novalidate>
+        <section class="card">
+          <h2>认证等级 <em>*</em></h2>
+          <div class="radio-group grade-group" role="radiogroup" aria-label="认证等级">
+            <label class="radio-pill"><input type="radio" name="grade" value="A" required><span>A · 优秀</span></label>
+            <label class="radio-pill"><input type="radio" name="grade" value="B"><span>B · 良好</span></label>
+            <label class="radio-pill"><input type="radio" name="grade" value="C"><span>C · 合格</span></label>
+            <label class="radio-pill"><input type="radio" name="grade" value="D"><span>D · 待整备</span></label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>认证信息</h2>
+          <label class="field">
+            <span>认证人 <em>*</em></span>
+            <input type="text" name="certifierName" required maxlength="50" placeholder="原厂认证专家姓名">
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>质保月数</span>
+              <input type="number" name="warrantyMonths" min="0" inputmode="numeric" placeholder="例如：6">
+            </label>
+          </div>
+          <label class="field">
+            <span>质保条款说明</span>
+            <textarea name="warrantyNotes" maxlength="500" rows="2" placeholder="例如：核心部件保修，人为损坏不在保修范围"></textarea>
+          </label>
+          <label class="field">
+            <span>认证备注</span>
+            <textarea name="summaryNotes" maxlength="1000" rows="3" placeholder="专家评估意见，供报告展示"></textarea>
+          </label>
+        </section>
+
+        <div id="form-message" class="form-message" role="status" aria-live="polite"></div>
+
+        <button type="submit" class="submit-button">生成认证报告</button>
+      </form>
+
+      <div id="success-panel" class="card" style="display:none;">
+        <p>认证已提交。</p>
+        <a class="submit-button" id="view-report-link" style="display:block; text-align:center; text-decoration:none;">查看认证报告</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var API_BASE = 'https://rlpxjrqhdniyavixvgyz.supabase.co/functions/v1/roland-select';
+  var INTENT_LABELS = { buy: '想买', sell: '想卖', both: '想买/想卖' };
+  var MAINTENANCE_LABELS = { factory: '原厂维护', informal: '社会散修', mixed: '混合', unknown: '不详' };
+  var CONDITION_LABELS = { missingWaterTank: '缺水箱', missingUV: '缺UV', missingDryer: '缺干燥组', cylinderDamage: '压过炮', other: '其他' };
+  var GRADE_LABELS = { A: 'A · 优秀', B: 'B · 良好', C: 'C · 合格', D: 'D · 待整备' };
+
+  var submissionId = new URLSearchParams(location.search).get('submission');
+
+  var authGate = document.getElementById('auth-gate');
+  var authMessage = document.getElementById('auth-message');
+  var passwordInput = document.getElementById('admin-password');
+  var authSubmit = document.getElementById('auth-submit');
+  var mainView = document.getElementById('main-view');
+  var authHeader = '';
+  var submission = null;
+
+  function dt(dl, label, value) {
+    var dtEl = document.createElement('dt');
+    dtEl.textContent = label;
+    var ddEl = document.createElement('dd');
+    ddEl.textContent = value === undefined || value === null || value === '' ? '—' : value;
+    dl.appendChild(dtEl);
+    dl.appendChild(ddEl);
+  }
+
+  function renderSubmissionSummary(record) {
+    var dl = document.getElementById('submission-summary');
+    dl.innerHTML = '';
+    dt(dl, '客户名称', record.customer_name);
+    dt(dl, '买卖意向', INTENT_LABELS[record.intent] || record.intent);
+    dt(dl, '设备型号', record.model);
+    dt(dl, '序列号', record.serial_number);
+    dt(dl, '总印数', record.total_impressions);
+    dt(dl, '生产小时数', record.production_hours);
+    dt(dl, '维护历史', MAINTENANCE_LABELS[record.maintenance_history] || record.maintenance_history);
+    var conditionText = Array.isArray(record.condition_issues)
+      ? record.condition_issues.map(function (issue) { return CONDITION_LABELS[issue] || issue; }).join('、')
+      : '';
+    dt(dl, '外观问题', conditionText);
+    dt(dl, '录入人', record.sales_rep);
+  }
+
+  function renderExistingCert(cert) {
+    if (!cert) return;
+    document.getElementById('existing-cert-card').style.display = 'block';
+    var dl = document.getElementById('existing-cert-summary');
+    dl.innerHTML = '';
+    dt(dl, '当前等级', GRADE_LABELS[cert.grade] || cert.grade);
+    dt(dl, '认证人', cert.certifier_name);
+    dt(dl, '认证时间', cert.certified_at ? new Date(cert.certified_at).toLocaleString('zh-CN') : '');
+  }
+
+  async function loadData() {
+    var headers = authHeader ? { Authorization: authHeader } : {};
+    var [submissionsRes, certificationsRes] = await Promise.all([
+      fetch(API_BASE + '/api/submissions', { headers: headers }),
+      fetch(API_BASE + '/api/certifications', { headers: headers }),
+    ]);
+
+    if (submissionsRes.status === 401 || certificationsRes.status === 401) {
+      authMessage.textContent = '密码错误';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+    if (!submissionsRes.ok || !certificationsRes.ok) {
+      authMessage.textContent = '加载失败';
+      authMessage.className = 'form-message error';
+      return false;
+    }
+
+    var submissionsData = await submissionsRes.json();
+    var certificationsData = await certificationsRes.json();
+    var submissions = submissionsData.submissions || [];
+    var certifications = certificationsData.certifications || [];
+
+    submission = submissions.filter(function (s) { return s.id === submissionId; })[0] || null;
+
+    if (!submission) {
+      document.getElementById('not-found-card').style.display = 'block';
+      document.getElementById('content').style.display = 'none';
+      return true;
+    }
+
+    document.getElementById('not-found-card').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    renderSubmissionSummary(submission);
+
+    var existingCerts = certifications.filter(function (c) { return c.submission_id === submissionId; });
+    if (existingCerts.length > 0) {
+      renderExistingCert(existingCerts[0]);
+    }
+
+    return true;
+  }
+
+  authSubmit.addEventListener('click', async function () {
+    authHeader = 'Basic ' + btoa('admin:' + passwordInput.value);
+    authMessage.textContent = '加载中...';
+    authMessage.className = 'form-message';
+    authSubmit.disabled = true;
+
+    try {
+      var ok = await loadData();
+      if (ok) {
+        authGate.style.display = 'none';
+        mainView.style.display = 'block';
+      }
+    } catch (error) {
+      authMessage.textContent = '网络异常，请重试';
+      authMessage.className = 'form-message error';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  passwordInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') authSubmit.click();
+  });
+
+  var form = document.getElementById('certify-form');
+  var formMessage = document.getElementById('form-message');
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    var formData = new FormData(form);
+    var payload = {
+      submissionId: submissionId,
+      grade: formData.get('grade') || '',
+      certifierName: formData.get('certifierName') || '',
+      warrantyMonths: formData.get('warrantyMonths') || '',
+      warrantyNotes: formData.get('warrantyNotes') || '',
+      summaryNotes: formData.get('summaryNotes') || '',
+    };
+
+    var submitButton = form.querySelector('.submit-button');
+    submitButton.disabled = true;
+    formMessage.textContent = '提交中...';
+    formMessage.className = 'form-message';
+
+    try {
+      var response = await fetch(API_BASE + '/api/certifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify(payload),
+      });
+      var result = await response.json();
+
+      if (!response.ok) {
+        var firstError = result.errors && result.errors[0];
+        formMessage.textContent = firstError ? firstError.message : '提交失败，请检查表单';
+        formMessage.className = 'form-message error';
+        return;
+      }
+
+      form.style.display = 'none';
+      formMessage.textContent = '';
+      var successPanel = document.getElementById('success-panel');
+      successPanel.style.display = 'block';
+      document.getElementById('view-report-link').href = 'report.html?id=' + encodeURIComponent(submissionId);
+    } catch (error) {
+      formMessage.textContent = '网络异常，请检查后重试';
+      formMessage.className = 'form-message error';
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+
+  if (!submissionId) {
+    document.body.innerHTML = '<div class="page"><section class="card"><p>缺少设备记录参数，请从 <a href="admin.html">数据管理页</a> 进入。</p></section></div>';
+  }
+})();
+</script>
+</body>
+</html>

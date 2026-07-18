@@ -58,6 +58,7 @@
             <th>期望成交价</th>
             <th>期望周期</th>
             <th>备注</th>
+            <th>认证</th>
           </tr>
         </thead>
         <tbody id="records-body"></tbody>
@@ -105,6 +106,14 @@
     tr.appendChild(cell(record.expected_price));
     tr.appendChild(cell(record.expected_timeline));
     tr.appendChild(cell(record.notes));
+
+    var actionTd = document.createElement('td');
+    var certifyLink = document.createElement('a');
+    certifyLink.href = 'certify.html?submission=' + encodeURIComponent(record.id);
+    certifyLink.textContent = '认证报告';
+    actionTd.appendChild(certifyLink);
+    tr.appendChild(actionTd);
+
     return tr;
   }
 

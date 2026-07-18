@@ -1,5 +1,5 @@
 (function () {
-  var API_BASE = '/functions/v1/roland-select';
+  var API_BASE = 'https://rlpxjrqhdniyavixvgyz.supabase.co/functions/v1/roland-select';
 
   var form = document.getElementById('intake-form');
   var messageBox = document.getElementById('form-message');
